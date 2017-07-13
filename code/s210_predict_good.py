@@ -15,6 +15,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, log_loss, confusion_matrix
+from sklearn.metrics import roc_curve, auc
 from sklearn.ensemble.forest import RandomForestRegressor, RandomForestClassifier
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -37,7 +38,7 @@ np.random.seed(2017)
 """ define working directory"""
 os.chdir("C:/Documents/4_ML Ressources/Kaggle/Zillow")
 
-def feature_engineering(df,verbose=False) :
+def feature_engineering(df,isTest=False,verbose=False) :
 
     if 'transactiondate' in df.columns:
 #        # extract month of the year
@@ -95,6 +96,13 @@ def feature_engineering(df,verbose=False) :
 
     df.set_index('parcelid',inplace=True)
 
+    
+    # data selection 
+    # 0 : bad fit
+    # 1 : good fit
+    if not isTest :
+        df.loc[df.bin==2,'bin'] = 0
+
     return df
 
 
@@ -128,33 +136,14 @@ def train_model(X_train,y_train):
     
     rf = RandomForestClassifier(
                max_features="auto",
-               n_estimators=2000,
+               n_estimators=1000,
                max_depth=8,
                n_jobs=-1,
                class_weight = 'balanced',
-               verbose=2)
+               verbose=1)
     rf.fit(X_train_train,y_train_train)
     
     # feature importances
-    """
-    1. yearbuilt (0.162658)
-    2. taxamount (0.105406)
-    3. longitude (0.097042)
-    4. calculatedfinishedsquarefeet (0.087377)
-    5. taxvaluedollarcnt (0.079987)
-    6. latitude (0.079290)
-    7. finishedsquarefeet12 (0.068321)
-    8. landtaxvaluedollarcnt (0.063815)
-    9. structuretaxvaluedollarcnt (0.062230)
-    10. lotsizesquarefeet (0.054081)
-    11. propertylandusetypeid (0.031431)
-    12. bathroomcnt (0.030924)
-    13. calculatedbathnbr (0.029481)
-    14. bedroomcnt (0.018794)
-    15. fullbathcnt (0.017133)
-    16. roomcnt (0.012031)
-    17. assessmentyear (0.000000) - tax assessment year
-    """
    
 #    feature_importance = False
 #    if(feature_importance):
@@ -265,9 +254,11 @@ def evaluate_model(model, X_val, y_val,plot=False):
         for j in range(cf.shape[1]):
             cf[i,j] = round(cf[i,j]/sum_row*100.0)
     
-    np.savetxt('data/s1_intermediate/confusion_matrix.csv',cf,delimiter=',')
+    # AUC
+    fpr, tpr, thresholds = roc_curve(y_val, y_pred_proba[:,1], pos_label=1)
     
-    print(".. test log_loss  : {:0.3f} %".format(log_loss(y_val,y_pred_proba)*100))
+    print(".. test log_loss  : {:0.2f} %".format(log_loss(y_val,y_pred_proba)*100))
+    print(".. test AUC       : {:0.2f} %".format(auc(fpr, tpr)*100))
     print(".. confusion matrix (in %):")
     print(cf)
  
@@ -278,7 +269,7 @@ def predict_on_test(mdl,scaler,cols_to_keep):
     
     full_test    = read_data('test')
     full_test    = full_test[[x for x in cols_to_keep if x not in ['logerror','transactiondate']]]
-    full_test    = feature_engineering(full_test)
+    full_test    = feature_engineering(full_test,isTest=True)
     
     tests        = np.array_split(full_test, 30)
     
@@ -287,10 +278,11 @@ def predict_on_test(mdl,scaler,cols_to_keep):
         print("="*10+" Predictong on batch {}/{} ".format(i+1,len(tests)) + "="*10)
         X_test       = scaler.transform(test.values)
         y = mdl.predict_proba(X_test)
-        bin_result = pd.DataFrame(columns=['parcelid',0,1,2])
+        bin_result = pd.DataFrame(columns=['parcelid','p_bad_fit','p_good_fit'])
         bin_result.parcelid = test.index.values
-        for c in range(3):
-            bin_result[c] = y[:,c]
+        bin_result['p_bad_fit'] = y[:,0]
+        bin_result['p_good_fit'] = y[:,1] 
+     
         results.append(bin_result)
         
         del y
@@ -298,8 +290,8 @@ def predict_on_test(mdl,scaler,cols_to_keep):
         gc.collect()
         
     results = pd.concat(results)
-    results.to_csv('data/s1_intermediate/test_bin_prediction.csv',index=False)
-    alert(1)
+    results.to_csv('data/s1_intermediate/output_s210.csv',index=False)
+#    alert(1)
     
 
 def main() :
@@ -327,11 +319,11 @@ def main() :
 
     ## predict on val set and evaluate
     y_val_pred  = evaluate_model(mdl, X_val,y_val,plot=False)
-    y_val_pred
-    alert(1)
+    y_val_pred  = y_val_pred
+#    alert(1)
 
    ##predict test
-#    predict_on_test(mdl,scaler,cols_to_keep)
+    predict_on_test(mdl,scaler,cols_to_keep)
 
 
 if __name__ == '__main__':

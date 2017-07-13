@@ -1,6 +1,7 @@
 {
-    "max_features": "sqrt",
-    "n_estimators": 2000,
-    "min_samples_leaf": 1,
-    "cv_logloss": 0.9178941861855989
+    "max_features": 0.4,
+    "n_estimators": 1000,
+    "min_samples_leaf": 0.01,
+    "max_depth": null,
+    "cv_logloss": 1.0565408303119974
 }

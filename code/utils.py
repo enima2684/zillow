@@ -71,6 +71,14 @@ def read_classification_output():
     class_output = pd.read_csv('data/s1_intermediate/test_bin_prediction.csv')
     return class_output
 
+def read_prob_bad_good_fit():
+    class_output = pd.read_csv('data/s1_intermediate/output_s210.csv')
+    return class_output
+
+def read_prob_under_over_estimation():
+    class_output = pd.read_csv('data/s1_intermediate/output_s220.csv')
+    return class_output
+
 def read_logerror_per_bin():
     logerror_per_bin = pd.read_csv('data/s1_intermediate/train_logerror_per_bin.csv')
     return logerror_per_bin
