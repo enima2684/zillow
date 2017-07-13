@@ -1,0 +1,9 @@
+s1:
+    # === s1_create_bins === #
+    
+    # quantiles used to split
+    # these quantiles were obtained with the script POC_cluster_outcome.py
+    q1 : 0.225
+    q2 : 0.82
+    
+    

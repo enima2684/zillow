@@ -1,0 +1,6 @@
+{
+    "max_features": "sqrt",
+    "n_estimators": 2000,
+    "min_samples_leaf": 1,
+    "cv_logloss": 0.9178941861855989
+}
