@@ -327,7 +327,7 @@ def main() :
 #    alert(1)
 
    ##predict test
-    predict_on_test(mdl,scaler,cols_to_keep)
+#    predict_on_test(mdl,scaler,cols_to_keep)
 
 
 if __name__ == '__main__':

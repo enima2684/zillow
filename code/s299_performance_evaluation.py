@@ -13,8 +13,30 @@ import gc
 from sklearn.metrics import mean_absolute_error as mae
 
 from utils import alert
-from utils import read_logerror_per_bin, read_data
+from utils import read_logerror_per_bin, read_data, read_bins
 from utils import read_prob_bad_good_fit,read_prob_under_over_estimation
+
+""" == Logging == """
+"""
+
+Evolution of the MAE
+
+6.721%  ----------->  6.578%  ----------->   4.417%
+            (1)                   (2)
+            
+
+6.721%  ----------->  5.344%
+            (2)
+
+
+(1) : perfect good/bad fit
+(2) : perfect under/over estimation
+
+we should focus on (2) !
+
+"""
+""" ============= """
+
 
 def main():
     
@@ -38,6 +60,22 @@ def main():
     submit['logerror_0'] = logerror_per_bin[0]
     submit['logerror_1'] = logerror_per_bin[1]
     submit['logerror_2'] = logerror_per_bin[2]
+    
+    #test step 1
+#    submit           = read_bins(submit)
+#    submit.loc[submit.bin == 1,'p_good_fit'] = 1
+#    submit.loc[submit.bin == 1,'p_bad_fit'] = 0
+#    submit.loc[submit.bin != 1,'p_good_fit'] = 0
+#    submit.loc[submit.bin != 1,'p_bad_fit'] = 1
+    
+    
+    # test step 2
+#    submit.loc[submit.bin == 0,'p_under_est'] = 1
+#    submit.loc[submit.bin == 0,'p_over_est'] = 0
+#    submit.loc[submit.bin == 2,'p_under_est'] = 0
+#    submit.loc[submit.bin == 2,'p_over_est'] = 1
+    
+    
     
     submit['pred'] = (submit['logerror_0'] * submit['p_bad_fit'] * submit['p_under_est'] +
                       submit['logerror_1'] * submit['p_good_fit'] +
