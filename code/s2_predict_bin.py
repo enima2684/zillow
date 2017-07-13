@@ -17,7 +17,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, log_loss
 from sklearn.ensemble.forest import RandomForestRegressor, RandomForestClassifier
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.calibration import CalibratedClassifierCV
 from matplotlib import pyplot as plt
 import numpy as np
 from datetime import datetime
@@ -118,19 +119,33 @@ def create_inputs_model(df,objectif_var,test_size=0.3):
 
 def train_model(X_train,y_train):
     print("training the model ...")
+    
+    # create sets for probability calibration
+    X_train_train, X_prob_cal, y_train_train, y_prob_cal = train_test_split(X_train,
+                                                            y_train,
+                                                            test_size=0.2)
+
+    
     rf = RandomForestClassifier(
                max_features="sqrt",
-               n_estimators=2000,
-               min_samples_leaf=1,
+               n_estimators=1000,
+               max_depth=8,
                n_jobs=-1,
                class_weight = 'balanced',
                verbose=2)
-    rf.fit(X_train,y_train)
-    y_pred_train = rf.predict_proba(X_train)
+    rf.fit(X_train_train,y_train_train)
+    
+    
+    
+    sig_clf = CalibratedClassifierCV(rf, method="sigmoid", cv="prefit")
+    sig_clf.fit(X_prob_cal, y_prob_cal)
+    y_pred_train = sig_clf.predict_proba(X_train)
+    
+    
     print(".. training log_loss  : {:0.2f} %".format(log_loss(y_train,y_pred_train)*100))
-    return rf
+    return sig_clf
 
-def tune_model(X,y,K=7):
+def tune_model(X,y,K=5):
     print("tuning the model ...")
 
     """logging"""
@@ -145,7 +160,8 @@ def tune_model(X,y,K=7):
 
     params = {'max_features' : ['auto','sqrt',0.2,0.4],
               'n_estimators' : [10,50,100,500,1000,2000],
-              'min_samples_leaf' : [1,3,5,10,50,100,200]
+              'min_samples_leaf' : [0.01,0.02,0.05,0.1,0.15,0.2],
+              'max_depth' : [None,3,5,7,8,9,10]
               }
 
     nb_scenarios = np.product([len(params[x]) for x in params])
@@ -153,33 +169,36 @@ def tune_model(X,y,K=7):
     for max_f in params['max_features'] :
         for n_est in params['n_estimators'] :
             for min_leaf in params['min_samples_leaf'] :
-                kf = KFold(n_splits=K)
-                errors_fold = []
-                for train_index, test_index in kf.split(X):
-                    X_train, X_test = X[train_index], X[test_index]
-                    y_train, y_test = y[train_index], y[test_index]
+                for max_dep in params['max_depth']:
+                    kf = StratifiedKFold(n_splits=K)
+                    errors_fold = []
+                    for train_index, test_index in kf.split(X,y):
+                        X_train_bis, X_test = X[train_index], X[test_index]
+                        y_train_bis, y_test = y[train_index], y[test_index]
+    
+                        rf = RandomForestClassifier(
+                                   max_features=max_f,
+                                   n_estimators=n_est,
+                                   min_samples_leaf=min_leaf,
+                                   max_depth=max_dep,
+                                   n_jobs=-1,
+                                   class_weight = 'balanced')
+                        rf.fit(X_train_bis,y_train_bis)
+                        y_pred_test = rf.predict_proba(X_test)
+                        logloss = log_loss(y_test,y_pred_test)
+                        errors_fold.append(logloss)
 
-                    rf = RandomForestClassifier(
-                               max_features=max_f,
-                               n_estimators=n_est,
-                               min_samples_leaf=min_leaf,
-                               n_jobs=-1,
-                               class_weight = 'balanced')
-                    rf.fit(X_train,y_train)
-                    y_pred_test = rf.predict_proba(X_test)
-                    logloss = log_loss(y_test,y_pred_test)
-                    errors_fold.append(logloss)
 
+                    result = {'max_features' : max_f,
+                              'n_estimators':n_est,
+                              'min_samples_leaf':min_leaf,
+                              'max_depth':max_dep,
+                              'cv_logloss':np.mean(errors_fold)}
 
-                result = {'max_features' : max_f,
-                          'n_estimators':n_est,
-                          'min_samples_leaf':min_leaf,
-                          'cv_logloss':np.mean(errors_fold)}
-
-                results.append(result)
-                print("="*10 + " {}/{} ".format(len(results),nb_scenarios) + "="*10)
-                for key, value in result.items():
-                    print("{} : {}".format(key,value))
+                    results.append(result)
+                    print("="*10 + " {}/{} ".format(len(results),nb_scenarios) + "="*10)
+                    for key, value in result.items():
+                        print("{} : {}".format(key,value))
 
     results = sorted(results, key = lambda x : x['cv_logloss'])
     best_result = results[0]
@@ -243,15 +262,13 @@ def main() :
 
     df           = feature_engineering(df)
 
-
     ## create train and test set
     X_train, X_val, y_train, y_val, scaler = create_inputs_model(df,
                                                                  objectif_var='bin',
                                                                  test_size = 0.25)
 
-
     ## tune model
-#    tunings = tune_model(X_train,y_train,7)
+#    tunings = tune_model(X_train,y_train,5)
 
     ## train model
     mdl         = train_model(X_train,y_train)
@@ -263,21 +280,6 @@ def main() :
 
    ##predict test
     predict_on_test(mdl,scaler,cols_to_keep)
-#    test         = read_data('test')
-#    test         = test[[x for x in cols_to_keep if x not in ['logerror','transactiondate']]]
-#    test         = feature_engineering(test)
-#    X_test       = scaler.transform(test.values)
-#    y = mdl.predict_proba(X_test)
-#    alert(1)
-#
-#
-#   # save the results
-#    bin_result = pd.DataFrame(columns=['parcelid',0,1,2])
-#    bin_result.parcelid = test.index.values
-#    for c in range(3):
-#        bin_result[c] = y[:,c]
-#    bin_result.to_csv('data/s1_intermediate/test_bin_prediction.csv',index=False)
-#    alert(1)
 
 
 if __name__ == '__main__':
