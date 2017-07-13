@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul 11 18:19:14 2017
+Created on Fri Jul 14 00:30:14 2017
 
 @author: Bouamama Amine
 
-
+Performance evaluation
 """
 
 import pandas as pd
 from datetime import datetime
 import gc
+from sklearn.metrics import mean_absolute_error as mae
 
 from utils import alert
-from utils import read_logerror_per_bin
+from utils import read_logerror_per_bin, read_data
 from utils import read_prob_bad_good_fit,read_prob_under_over_estimation
 
 def main():
@@ -44,19 +45,15 @@ def main():
                         
     
     
-    submit['201610'] = submit['pred']
-    submit['201611'] = submit['pred']
-    submit['201612'] = submit['pred']
-    submit['201710'] = submit['pred']
-    submit['201711'] = submit['pred']
-    submit['201712'] = submit['pred']
+    # filter only training data for which we have an output
+    df = read_data()
+    df = df[['parcelid','logerror']]
+  
+    df = df.merge(submit[['parcelid','pred']],
+                  on='parcelid',
+                  how='left')
     
-    submit = submit[['parcelid','201610','201611','201612','201710','201711','201712']]
-    
-    print('..writting submission file')
-    submit.to_csv("submissions/submission"+datetime.now().strftime("%Y%m%d%H%M%S")+".csv",index=False)
-    alert(2)
-    
+    print('Final MAE : {:0.3f} %'.format(mae(df.logerror.values,df.pred.values)*100))
     
 if __name__ == '__main__':
     main()
