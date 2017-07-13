@@ -14,7 +14,7 @@ import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, log_loss
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, log_loss, confusion_matrix
 from sklearn.ensemble.forest import RandomForestRegressor, RandomForestClassifier
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import KFold, StratifiedKFold
@@ -58,7 +58,7 @@ def feature_engineering(df,verbose=False) :
     if 'fips' in df.columns:
         df.drop('fips',axis=1,inplace=True)
 
-    # remove propertycountylandusecode
+   # remove propertycountylandusecode
     if 'propertycountylandusecode' in df.columns:
         df.drop('propertycountylandusecode',axis=1,inplace=True)
 
@@ -153,30 +153,30 @@ def train_model(X_train,y_train):
     14. bedroomcnt (0.018794)
     15. fullbathcnt (0.017133)
     16. roomcnt (0.012031)
-    17. assessmentyear (0.000000)
+    17. assessmentyear (0.000000) - tax assessment year
     """
-    
-    feature_importance = False
-    if(feature_importance):
-        
-        importances = rf.feature_importances_
-        std = np.std([tree.feature_importances_ for tree in rf.estimators_],
-                 axis=0)
-        indices = np.argsort(importances)[::-1]
-        col_names = df.drop('bin',axis=1).columns.values
-        print("Feature ranking:")
-        
-        for f in range(X_train_train.shape[1]):
-            print("%d. %s (%f)" % (f + 1, col_names[indices[f]], importances[indices[f]]))
-        
-        # Plot the feature importances of the forest
-        plt.figure()
-        plt.title("Feature importances")
-        plt.bar(range(X_train_train.shape[1]), importances[indices],
-               color="r", yerr=std[indices], align="center")
-        plt.xticks(range(X_train_train.shape[1]), col_names[indices],rotation = 50)
-        plt.xlim([-1, X_train_train.shape[1]])
-        plt.show()
+   
+#    feature_importance = False
+#    if(feature_importance):
+#        
+#        importances = rf.feature_importances_
+#        std = np.std([tree.feature_importances_ for tree in rf.estimators_],
+#                 axis=0)
+#        indices = np.argsort(importances)[::-1]
+#        col_names = df.drop('bin',axis=1).columns.values
+#        print("Feature ranking:")
+#        
+#        for f in range(X_train_train.shape[1]):
+#            print("%d. %s (%f)" % (f + 1, col_names[indices[f]], importances[indices[f]]))
+#        
+#        # Plot the feature importances of the forest
+#        plt.figure()
+#        plt.title("Feature importances")
+#        plt.bar(range(X_train_train.shape[1]), importances[indices],
+#               color="r", yerr=std[indices], align="center")
+#        plt.xticks(range(X_train_train.shape[1]), col_names[indices],rotation = 50)
+#        plt.xlim([-1, X_train_train.shape[1]])
+#        plt.show()
         
     
     # Probability calibration
@@ -256,13 +256,21 @@ def evaluate_model(model, X_val, y_val,plot=False):
     print("="*40)
     print("Model Evaluation")
 
-    y_pred = model.predict_proba(X_val)
-    print(".. test log_loss  : {:0.3f} %".format(log_loss(y_val,y_pred)*100))
-
-    print("\n")
-    if plot:
-        plt.scatter(y_pred,y_val,s=1,alpha=0.7)
-        plt.plot(y_pred,y_pred,alpha=0.7,c='r')
+    y_pred_proba = model.predict_proba(X_val)
+    y_pred       = model.predict(X_val)
+    cf = confusion_matrix(y_val,y_pred) 
+    cf = cf.astype('float')
+    for i in range(cf.shape[0]):
+        sum_row = np.sum(cf[i,:])
+        for j in range(cf.shape[1]):
+            cf[i,j] = round(cf[i,j]/sum_row*100.0)
+    
+    np.savetxt('data/s1_intermediate/confusion_matrix.csv',cf,delimiter=',')
+    
+    print(".. test log_loss  : {:0.3f} %".format(log_loss(y_val,y_pred_proba)*100))
+    print(".. confusion matrix (in %):")
+    print(cf)
+ 
     return y_pred
 
 
@@ -323,7 +331,7 @@ def main() :
     alert(1)
 
    ##predict test
-    predict_on_test(mdl,scaler,cols_to_keep)
+#    predict_on_test(mdl,scaler,cols_to_keep)
 
 
 if __name__ == '__main__':
