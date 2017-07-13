@@ -40,7 +40,7 @@ os.chdir("C:/Documents/4_ML Ressources/Kaggle/Zillow")
 def feature_engineering(df,verbose=False) :
 
     if 'transactiondate' in df.columns:
-        # extract month of the year
+#        # extract month of the year
 #        df['Month'] = df['transactiondate'].map(lambda x: x.month)
 #        df['YearMonth'] = df['transactiondate'].map(lambda x: 100*x.year + x.month)
 #
@@ -127,16 +127,59 @@ def train_model(X_train,y_train):
 
     
     rf = RandomForestClassifier(
-               max_features="sqrt",
-               n_estimators=1000,
+               max_features="auto",
+               n_estimators=2000,
                max_depth=8,
                n_jobs=-1,
                class_weight = 'balanced',
                verbose=2)
     rf.fit(X_train_train,y_train_train)
     
+    # feature importances
+    """
+    1. yearbuilt (0.162658)
+    2. taxamount (0.105406)
+    3. longitude (0.097042)
+    4. calculatedfinishedsquarefeet (0.087377)
+    5. taxvaluedollarcnt (0.079987)
+    6. latitude (0.079290)
+    7. finishedsquarefeet12 (0.068321)
+    8. landtaxvaluedollarcnt (0.063815)
+    9. structuretaxvaluedollarcnt (0.062230)
+    10. lotsizesquarefeet (0.054081)
+    11. propertylandusetypeid (0.031431)
+    12. bathroomcnt (0.030924)
+    13. calculatedbathnbr (0.029481)
+    14. bedroomcnt (0.018794)
+    15. fullbathcnt (0.017133)
+    16. roomcnt (0.012031)
+    17. assessmentyear (0.000000)
+    """
     
+    feature_importance = False
+    if(feature_importance):
+        
+        importances = rf.feature_importances_
+        std = np.std([tree.feature_importances_ for tree in rf.estimators_],
+                 axis=0)
+        indices = np.argsort(importances)[::-1]
+        col_names = df.drop('bin',axis=1).columns.values
+        print("Feature ranking:")
+        
+        for f in range(X_train_train.shape[1]):
+            print("%d. %s (%f)" % (f + 1, col_names[indices[f]], importances[indices[f]]))
+        
+        # Plot the feature importances of the forest
+        plt.figure()
+        plt.title("Feature importances")
+        plt.bar(range(X_train_train.shape[1]), importances[indices],
+               color="r", yerr=std[indices], align="center")
+        plt.xticks(range(X_train_train.shape[1]), col_names[indices],rotation = 50)
+        plt.xlim([-1, X_train_train.shape[1]])
+        plt.show()
+        
     
+    # Probability calibration
     sig_clf = CalibratedClassifierCV(rf, method="sigmoid", cv="prefit")
     sig_clf.fit(X_prob_cal, y_prob_cal)
     y_pred_train = sig_clf.predict_proba(X_train)
@@ -232,7 +275,8 @@ def predict_on_test(mdl,scaler,cols_to_keep):
     tests        = np.array_split(full_test, 30)
     
     results = []
-    for test in tests:
+    for i, test in enumerate(tests):
+        print("="*10+" Predictong on batch {}/{} ".format(i+1,len(tests)) + "="*10)
         X_test       = scaler.transform(test.values)
         y = mdl.predict_proba(X_test)
         bin_result = pd.DataFrame(columns=['parcelid',0,1,2])
