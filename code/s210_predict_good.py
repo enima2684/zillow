@@ -136,7 +136,7 @@ def train_model(X_train,y_train):
     
     rf = RandomForestClassifier(
                max_features="auto",
-               n_estimators=1000,
+               n_estimators=2000,
                max_depth=8,
                n_jobs=-1,
                class_weight = 'balanced',

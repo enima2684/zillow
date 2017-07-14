@@ -140,7 +140,7 @@ def train_model(X_train,y_train):
     
     rf = RandomForestClassifier(
                max_features="auto",
-               n_estimators=1000,
+               n_estimators=2000,
                max_depth=8,
                n_jobs=-1,
                class_weight = 'balanced',
@@ -310,10 +310,22 @@ def main() :
 
     df           = feature_engineering(df)
 
-    ## create train and test set
-    X_train, X_val, y_train, y_val, scaler = create_inputs_model(df,
-                                                                 objectif_var='bin',
-                                                                 test_size = 0.25)
+    
+    ## split on train and test
+    msk = np.random.rand(len(df)) < 0.75
+    train = df[msk]
+    val = df[~msk]
+
+    X_train = train.drop('bin',axis=1).values
+    X_val   = val.drop('bin',axis=1).values
+    
+    scaler = StandardScaler().fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_val   = scaler.transform(X_val)  
+    
+    y_train  = train['bin'].values
+    y_val    = val['bin'].values
+
 
     ## tune model
 #    tunings = tune_model(X_train,y_train,5)
@@ -324,10 +336,25 @@ def main() :
     ## predict on val set and evaluate
     y_val_pred  = evaluate_model(mdl, X_val,y_val,plot=False)
     y_val_pred  = y_val_pred
+
+
 #    alert(1)
 
    ##predict test
-#    predict_on_test(mdl,scaler,cols_to_keep)
+    predict_on_test(mdl,scaler,cols_to_keep)
+
+
+
+
+    # analysis
+#    y_pred       = mdl.predict(X_val)
+#    errors = val[((y_pred == 0) * (y_val == 1))]
+#    goods  = val[ ((y_pred == 1) * (y_val == 1)) ]
+#    
+#    import seaborn as sns
+#    variable = 'yearnuilt'
+#    sns.distplot(errors[variable],hist=False,label='errors')
+#    sns.distplot(goods[variable],hist=False,label='non-errors')
 
 
 if __name__ == '__main__':
